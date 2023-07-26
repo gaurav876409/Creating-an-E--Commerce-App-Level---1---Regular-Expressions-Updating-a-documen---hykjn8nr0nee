@@ -36,6 +36,43 @@ If no products match the search criteria, return a JSON response with a status c
 const searchProducts = async (req, res) => {
     try {
         // Write Your Code Here
+        const {
+            page = 1,
+            limit = 10,
+            search,
+            category,
+            sort = "desc",
+            minPrice,
+            maxPrice,
+        } = req.query;
+        const query = {};
+        if(search){
+            query.name = {$regex: search, $options: "i"};
+        }
+        if(category){
+            query.category = category;
+        }
+        if(minPrice && maxPrice){
+            query.price = {$gte: parseInt(minPrice), $lte: parseInt(maxPrice)};
+        }else if(minPrice){
+            query.price = {$gte: parseInt(minPrice)};
+        }else if(maxPrice){
+            query.price = {$lte: parseInt(maxPrice)};
+        }
+        const totalCount = await Product.countDocuments(query);
+
+        const products = await Product.find(query)
+        .sort({price: sort === "asc" ? 1 : -1})
+        .limit(limit*1)
+        .skip((page-1)*limit);
+
+        res.status(200).json({
+            status: "success",
+            data: {
+                count: totalCount,
+                products,
+            },
+        });
     } catch (err) {
         res.status(404).json({
             message: "Products Not Found",
@@ -74,6 +111,21 @@ Handle any errors that may occur during the retrieval and return a JSON response
 const getProductByID = async (req, res) => {
     try {
         // Write Your Code Here
+        const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        status: "Error",
+        message: "Product Not Found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        product,
+      },
+    });
     } catch (err) {
         res.status(400).json({
             message: "Product Fetching Failed",
@@ -109,6 +161,31 @@ Handle any errors that may occur during the creation and return a JSON response 
 const createProduct = async (req, res) => {
     try {
         // Write Your Code Here
+        const { name, description, price, category } = req.body;
+
+    if (!name || !description || !price || !category) {
+      return res.status(400).json({
+        message: "Product Creation Failed",
+        status: "Error",
+        error: "Missing required fields",
+      });
+    }
+
+    const product = new Product({
+      name,
+      description,
+      price,
+      category,
+    });
+
+    const newProduct = await product.save();
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        product: newProduct,
+      },
+    });
     } catch (err) {
         res.status(400).json({
             message: "Product Creation Failed",
@@ -155,6 +232,26 @@ If there is any error while updating the product, the function should return a J
 const updateProduct = async (req, res) => {
     try {
         // Write Your Code Here
+        const { updatedData } = req.body;
+    const product = await Product.findByIdAndUpdate(req.params.id, updatedData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        message: "Product Not Found",
+        status: "Error",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Product Updated Successfully",
+      data: {
+        updatedProduct: product,
+      },
+    });
     } catch (err) {
         // console.log(err);
         res.status(400).json({
@@ -190,6 +287,20 @@ If an error occurs during the deletion process, return a JSON response with a st
 const deleteProduct = async (req, res) => {
     try {
        // Write Your Code Here
+       const product = await Product.findByIdAndDelete(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        status: "Error",
+        message: "Product Not Found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: null,
+      message: `Product ${product._id} deleted successfully`,
+    });
     } catch (err) {
         res.status(400).json({
             status: "Error",
